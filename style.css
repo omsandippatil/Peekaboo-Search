@@ -259,6 +259,50 @@ h3 {
     height: 100%;
     border: none;
 }
+/* General container styles */
+#googleResults {
+    max-width: 100%; /* Ensure the container doesn't exceed its parent width */
+    overflow: hidden; /* Prevent data from overflowing */
+    padding: 10px; /* Add some spacing */
+    border: 1px solid #ccc; /* Add a border for better visibility */
+    border-radius: 5px;
+    background-color: #ffffff; /* Add background color */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Slight shadow for aesthetics */
+}
+
+/* Table container to make it scrollable */
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    overflow-x: auto; /* Allow horizontal scrolling if table is too wide */
+    display: block; /* Ensure table scrolls inside the container */
+}
+
+/* Table headers and rows */
+.results-table th,
+.results-table td {
+    border: 1px solid #000000;
+    padding: 10px;
+    text-align: left;
+    word-wrap: break-word; /* Prevent long words from breaking layout */
+}
+
+.results-table th {
+    background-color: #000000;
+}
+
+/* Pre-formatted summary block */
+.structured-summary {
+    background: #000000;
+    padding: 15px;
+    border-radius: 5px;
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-wrap: break-word; /* Wrap long lines */
+    overflow-y: auto; /* Allow vertical scrolling if content is too long */
+    max-height: 300px; /* Limit height to prevent component overflow */
+}
 
 /* News Results Styles */
 .news-result {

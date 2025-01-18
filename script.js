@@ -55,9 +55,123 @@ const API = {
 const Components = {
     async fetchGoogleResults(query) {
         const container = document.getElementById('googleResults');
-        container.innerHTML = '<h3>Google Analysis</h3><p>Google analysis results would appear here...</p>';
+        container.innerHTML = '<h3>Google Analysis</h3><p>Loading...</p>';
+    
+        try {
+            // Step 1: Scrape data using ScraperAPI
+            const scrapeResponse = await fetch(
+                `https://api.scraperapi.com?api_key=${CONFIG.gSCRAPER_API_KEY}&url=https://www.google.com/search?q=${encodeURIComponent(query)}`
+            );
+    
+            if (!scrapeResponse.ok) {
+                throw new Error('Failed to scrape data from Google');
+            }
+    
+            const scrapedData = await scrapeResponse.text();
+    
+            // Step 2: Parse the scraped data
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(scrapedData, 'text/html');
+            const results = Array.from(doc.querySelectorAll('.tF2Cxc')).map(result => ({
+                title: result.querySelector('.DKV0Md')?.textContent || "No title available",
+                snippet: result.querySelector('.aCOpRe')?.textContent || "No snippet available",
+                link: result.querySelector('a')?.href || "No link available",
+            }));
+    
+            if (results.length === 0) {
+                throw new Error('No valid results found from the scraped data.');
+            }
+    
+            // Step 3: Prepare a prompt for Groq API
+            const context = `
+                Provide a marketing-focused summary based on the following search results:
+                - Analyze competitors mentioned and provide an overview of their strengths and weaknesses.
+                - Suggest marketing strategies and advertisement ideas based on the data.
+                - Include dummy estimates for competitor advertisement budgets, campaign performance, and market share where direct data is unavailable.
+                - Structure the summary hierarchically in a bit-wise format for easier readability and insights:
+                    - Competitor Data
+                        - Competitor Name
+                        - Ad Spend (if available, otherwise estimate)
+                        - Market Position
+                    - Marketing Opportunities
+                        - Strengths to Leverage
+                        - Weaknesses to Exploit
+                        - Advertisement Recommendations
+            `;
+    
+            // Step 4: Summarize data using Groq API
+            const summaryResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${CONFIG.gGROQ_API_KEY}`,
+                },
+                body: JSON.stringify({
+                    model: "mixtral-8x7b-32768",
+                    messages: [
+                        { role: "system", content: context },
+                        { role: "user", content: JSON.stringify(results) },
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 3000,
+                }),
+            });
+    
+            if (!summaryResponse.ok) {
+                throw new Error('Failed to summarize data using Groq API.');
+            }
+    
+            const summaryData = await summaryResponse.json();
+            const summary = summaryData.choices?.[0]?.message?.content || "No summary data available.";
+    
+            // Step 5: Use component to display data
+            this.displayGoogleResults(results, summary);
+        } catch (error) {
+            console.error("Error in fetchGoogleResults:", error);
+    
+            container.innerHTML = `
+                <h3>Google Analysis</h3>
+                <p class="error">Error: ${error.message}</p>
+            `;
+        }
     },
+    
+    // Updated display component for structured data
+    displayGoogleResults(results, summary) {
+        const container = document.getElementById('googleResults');
+    
+        // Ensure everything is structured and stays inside the container
+        container.innerHTML = `
+            <div>
+                <h3>Google Analysis Summary</h3>
+                <pre>${summary}</pre>
+            </div>
+            <div>
+                <h4>Search Results</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Snippet</th>
+                            <th>Link</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${results.map(result => `
+                            <tr>
+                                <td>${result.title}</td>
+                                <td>${result.snippet}</td>
+                                <td><a href="${result.link}" target="_blank">Visit</a></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    },    
+    
 
+    
     async fetchRedditInsights(query) {
         const container = document.getElementById('redditResults');
         container.innerHTML = '<h3>Reddit Insights</h3><p>Reddit discussion analysis would appear here...</p>';
