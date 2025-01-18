@@ -251,30 +251,9 @@ const Components = {
             console.error('Trend graph container not found');
             return;
         }
-
-        container.innerHTML = '<h3>Trend Analysis</h3><div class="loading">Loading visualization...</div>';
-
-        // Default/dummy data structure
-        const dummyData = {
-            graphTitle: "Sample Analysis",
-            xAxisLabel: "Time Period",
-            yAxisLabel: "Value",
-            trendData: [
-                { x: "Jan", y: 30 },
-                { x: "Feb", y: 45 },
-                { x: "Mar", y: 25 },
-                { x: "Apr", y: 60 },
-                { x: "May", y: 40 },
-                { x: "Jun", y: 55 }
-            ],
-            pieData: [
-                { label: "Category A", value: 35 },
-                { label: "Category B", value: 25 },
-                { label: "Category C", value: 20 },
-                { label: "Category D", value: 20 }
-            ]
-        };
-
+    
+        container.innerHTML = '<h3>Market Analysis</h3><div class="loading">Loading visualizations...</div>';
+    
         try {
             // Ensure Chart.js is loaded
             if (typeof Chart === 'undefined') {
@@ -282,158 +261,235 @@ const Components = {
                     const script = document.createElement('script');
                     script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
                     script.onload = resolve;
-                    script.onerror = () => {
-                        reject(new Error('Failed to load Chart.js'));
-                    };
+                    script.onerror = () => reject(new Error('Failed to load Chart.js'));
                     document.head.appendChild(script);
                 });
             }
-
-            // Prepare container for charts
+    
+            // Get analysis data from Groq
+            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${CONFIG.pGROQ_API_KEY}`,
+                },
+                body: JSON.stringify({
+                    model: "mixtral-8x7b-32768",
+                    messages: [
+                        {
+                            role: "system",
+                            content: `Generate comprehensive market analysis data for visualization. Include:
+                                1. Historic trend data
+                                2. Market share distribution
+                                3. User sentiment distribution
+                                4. Regional distribution
+                                5. Age group distribution
+                                6. Price point distribution
+                                
+                                Format response as JSON with:
+                                {
+                                    "historicTrend": {
+                                        "title": "string",
+                                        "labels": ["month1",...],
+                                        "datasets": [
+                                            {
+                                                "label": "string",
+                                                "data": [number,...]
+                                            }
+                                        ]
+                                    },
+                                    "marketShare": {
+                                        "title": "string",
+                                        "labels": ["company1",...],
+                                        "data": [number,...]
+                                    },
+                                    "sentiment": {
+                                        "title": "string",
+                                        "labels": ["Positive", "Neutral", "Negative"],
+                                        "data": [number,...]
+                                    },
+                                    "regional": {
+                                        "title": "string",
+                                        "labels": ["region1",...],
+                                        "data": [number,...]
+                                    },
+                                    "demographics": {
+                                        "title": "string",
+                                        "labels": ["age1",...],
+                                        "data": [number,...]
+                                    },
+                                    "priceDistribution": {
+                                        "title": "string",
+                                        "labels": ["range1",...],
+                                        "data": [number,...]
+                                    }
+                                }`
+                        },
+                        {
+                            role: "user",
+                            content: `Generate market analysis visualization data for: ${query}`
+                        }
+                    ],
+                    temperature: 0.7,
+                    response_format: { type: "json_object" }
+                })
+            });
+    
+            if (!response.ok) throw new Error('Failed to get analysis data');
+    
+            const groqResponse = await response.json();
+            const data = JSON.parse(groqResponse.choices[0].message.content);
+    
+            // Prepare container for all charts
             container.innerHTML = `
-                <h3>Trend Analysis</h3>
-                <div class="visualization-container">
-                    <div id="lineChart"></div>
-                    <div id="pieChart"></div>
+                <h3>Market Analysis Dashboard</h3>
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <canvas id="historicTrendChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="marketShareChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="sentimentChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="regionalChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="demographicsChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="priceChart"></canvas>
+                    </div>
                 </div>
             `;
-
-            let data = dummyData; // Start with dummy data
-
-            try {
-                // Attempt to get real data from Groq API
-                const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${CONFIG.rGROQ_API_KEY}`,
-                    },
-                    body: JSON.stringify({
-                        model: "mixtral-8x7b-32768",
-                        messages: [
-                            {
-                                role: "system",
-                                content: "You are a data analyst. Format your response as a JSON string with exactly these fields: graphTitle (string), xAxisLabel (string), yAxisLabel (string), trendData (array of {x, y} objects), pieData (array of {label, value} objects). No explanation, just JSON."
-                            },
-                            {
-                                role: "user",
-                                content: query
-                            }
-                        ],
-                        temperature: 0.1,
-                        response_format: { type: "json_object" }
-                    })
-                });
-
-                if (response.ok) {
-                    const groqResponse = await response.json();
-                    const content = groqResponse.choices[0].message.content;
-                    const parsedData = typeof content === 'string' ? JSON.parse(content) : content;
-                    
-                    // Validate the data structure
-                    if (parsedData && parsedData.trendData && parsedData.pieData) {
-                        data = parsedData;
-                    } else {
-                        console.warn('Invalid data structure received, using dummy data');
-                    }
-                }
-            } catch (error) {
-                console.warn('Error fetching data, using dummy data:', error);
-                // Continue with dummy data
-            }
-
-            // Clean up any existing charts
-            ['lineChart', 'pieChart'].forEach(chartId => {
-                const existingChart = Chart.getChart(chartId);
-                if (existingChart) {
-                    existingChart.destroy();
-                }
-            });
-
-            // Create line chart
-            const lineChart = new Chart(document.getElementById('lineChart'), {
+    
+            // Common chart colors
+            const colors = {
+                line: 'rgb(75, 192, 192)',
+                pie: [
+                    'rgb(255, 99, 132)',
+                    'rgb(54, 162, 235)',
+                    'rgb(255, 205, 86)',
+                    'rgb(75, 192, 192)',
+                    'rgb(153, 102, 255)',
+                    'rgb(255, 159, 64)'
+                ],
+                bar: 'rgb(54, 162, 235)'
+            };
+    
+            // Create Historic Trend Line Chart
+            new Chart('historicTrendChart', {
                 type: 'line',
                 data: {
-                    labels: data.trendData.map(item => item.x),
-                    datasets: [{
-                        label: data.graphTitle || 'Trend Analysis',
-                        data: data.trendData.map(item => item.y),
-                        borderColor: 'rgb(75, 192, 192)',
-                        tension: 0.1,
-                        fill: false
-                    }]
+                    labels: data.historicTrend.labels,
+                    datasets: data.historicTrend.datasets.map(dataset => ({
+                        ...dataset,
+                        borderColor: colors.line,
+                        tension: 0.1
+                    }))
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: data.xAxisLabel || 'Time Period'
-                            }
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: data.yAxisLabel || 'Value'
-                            },
-                            beginAtZero: true
-                        }
-                    }
+                    plugins: { title: { display: true, text: data.historicTrend.title } }
                 }
             });
-
-            // Create pie chart
-            const pieChart = new Chart(document.getElementById('pieChart'), {
+    
+            // Create Market Share Pie Chart
+            new Chart('marketShareChart', {
                 type: 'pie',
                 data: {
-                    labels: data.pieData.map(item => item.label),
+                    labels: data.marketShare.labels,
                     datasets: [{
-                        data: data.pieData.map(item => item.value),
-                        backgroundColor: [
-                            'rgb(255, 99, 132)',
-                            'rgb(54, 162, 235)',
-                            'rgb(255, 205, 86)',
-                            'rgb(75, 192, 192)',
-                            'rgb(153, 102, 255)'
-                        ]
+                        data: data.marketShare.data,
+                        backgroundColor: colors.pie
                     }]
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'right'
-                        },
-                        title: {
-                            display: true,
-                            text: 'Distribution'
-                        }
-                    }
+                    plugins: { title: { display: true, text: data.marketShare.title } }
                 }
             });
-
-            // Add a note if using dummy data
-            if (data === dummyData) {
-                container.insertAdjacentHTML('beforeend', 
-                    '<div class="notice" style="text-align: center; padding: 10px; color: #666;">Note: Showing sample visualization data</div>'
-                );
-            }
-
+    
+            // Create Sentiment Doughnut Chart
+            new Chart('sentimentChart', {
+                type: 'doughnut',
+                data: {
+                    labels: data.sentiment.labels,
+                    datasets: [{
+                        data: data.sentiment.data,
+                        backgroundColor: colors.pie.slice(0, 3)
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { title: { display: true, text: data.sentiment.title } }
+                }
+            });
+    
+            // Create Regional Bar Chart
+            new Chart('regionalChart', {
+                type: 'bar',
+                data: {
+                    labels: data.regional.labels,
+                    datasets: [{
+                        label: 'Regional Distribution',
+                        data: data.regional.data,
+                        backgroundColor: colors.bar
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { title: { display: true, text: data.regional.title } }
+                }
+            });
+    
+            // Create Demographics Bar Chart
+            new Chart('demographicsChart', {
+                type: 'bar',
+                data: {
+                    labels: data.demographics.labels,
+                    datasets: [{
+                        label: 'Age Distribution',
+                        data: data.demographics.data,
+                        backgroundColor: colors.bar
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { title: { display: true, text: data.demographics.title } }
+                }
+            });
+    
+            // Create Price Distribution Bar Chart
+            new Chart('priceChart', {
+                type: 'bar',
+                data: {
+                    labels: data.priceDistribution.labels,
+                    datasets: [{
+                        label: 'Price Distribution',
+                        data: data.priceDistribution.data,
+                        backgroundColor: colors.bar
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { title: { display: true, text: data.priceDistribution.title } }
+                }
+            });
+    
         } catch (error) {
             console.error('Error in generateTrendGraph:', error);
             container.innerHTML = `
-                <h3>Trend Analysis</h3>
+                <h3>Market Analysis</h3>
                 <div class="error">
-                    <p>Error generating visualization: ${error.message}</p>
-                    <p>Please ensure your browser supports Chart.js and try again.</p>
+                    <p>Error generating visualizations: ${error.message}</p>
+                    <p>Please try again later.</p>
                 </div>
             `;
         }
     },
-
 
     async fetchYouTubeAnalysis(query) {
         const container = document.getElementById('youtubeAnalysis');
