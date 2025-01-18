@@ -172,10 +172,7 @@ const Components = {
     
 
     
-    async fetchRedditInsights(query) {
-        const container = document.getElementById('redditResults');
-        container.innerHTML = '<h3>Reddit Insights</h3><p>Reddit discussion analysis would appear here...</p>';
-    },
+    
 
     async fetchYouTubeAnalysis(query) {
         const container = document.getElementById('youtubeAnalysis');
