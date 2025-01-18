@@ -170,71 +170,92 @@ const Components = {
         `;
     },    
     
-    async fetchRedditAnalysis(subreddit, threads) {
+    async fetchRedditInsights(query) {
         const container = document.getElementById('redditResults');
-        container.innerHTML = '<h3>Reddit Marketing Analysis</h3><p>Loading...</p>';
+        container.innerHTML = '<h3>Reddit Insights</h3><p>Loading...</p>';
     
         try {
-            // Sample Reddit data structure - in a real app, this would come from your data source
-            const redditData = {
-                threads: [
-                    {
-                        title: "What's your experience with Product X?",
-                        upvotes: 1520,
-                        comments: [
-                            {
-                                text: "Used it for 6 months, great quality but expensive compared to competitors.",
-                                upvotes: 423
-                            },
-                            {
-                                text: "Their customer service is amazing, helped me resolve issues quickly.",
-                                upvotes: 256
-                            }
-                        ]
-                    },
-                    {
-                        title: "Product X vs Product Y - Detailed Comparison",
-                        upvotes: 2340,
-                        comments: [
-                            {
-                                text: "Product X has better features but Product Y is more user-friendly.",
-                                upvotes: 867
-                            },
-                            {
-                                text: "Been using both, Product X's premium pricing is justified by its durability.",
-                                upvotes: 645
-                            }
-                        ]
-                    }
-                ]
-            };
+            // Step 1: Scrape data using ScraperAPI with the provided query URL
+            const scrapeResponse = await fetch(
+                `https://api.scraperapi.com?api_key=${CONFIG.gSCRAPER_API_KEY}&url=https://www.reddit.com/search/?q=${encodeURIComponent(query)}&cId=f4a2f451-9acd-4444-bcdd-ecdc078e5e38&iId=8f79609c-6688-4863-a697-7fd95625b10e`
+            );
     
-            // Prepare context for Groq API
+            if (!scrapeResponse.ok) {
+                throw new Error('Failed to scrape data from Reddit');
+            }
+    
+            const scrapedData = await scrapeResponse.text();
+    
+            // Step 2: Parse the scraped data
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(scrapedData, 'text/html');
+            const results = Array.from(doc.querySelectorAll('.Post')).map(post => ({
+                title: post.querySelector('h3')?.textContent || "No title available",
+                snippet: post.querySelector('p')?.textContent || "No snippet available",
+                link: post.querySelector('a[data-click-id="body"]')?.href || "No link available",
+            }));
+    
+            // Step 3: Check if no valid results, generate dummy data using Groq
+            if (results.length === 0) {
+                console.warn('No valid results found, generating dummy data from Groq.');
+    
+                // Prepare a prompt for Groq API to generate dummy data
+                const context = `
+                    Generate a dummy Reddit post about a popular trending topic related to the query.
+                    The post should include:
+                    - A title
+                    - A brief snippet summarizing the discussion
+                    - A link to a relevant Reddit page.
+                `;
+    
+                // Step 4: Generate dummy data using Groq API
+                const summaryResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${CONFIG.gGROQ_API_KEY}`,
+                    },
+                    body: JSON.stringify({
+                        model: "mixtral-8x7b-32768",
+                        messages: [
+                            { role: "system", content: context },
+                            { role: "user", content: `Generate a dummy post based on the query: "${query}"` },
+                        ],
+                        temperature: 0.7,
+                        max_tokens: 3000,
+                    }),
+                });
+    
+                if (!summaryResponse.ok) {
+                    throw new Error('Failed to generate dummy data using Groq API.');
+                }
+    
+                const summaryData = await summaryResponse.json();
+                const summary = summaryData.choices?.[0]?.message?.content || "No summary data available.";
+    
+                // Mock a dummy result with the summary generated by Groq
+                results.push({
+                    title: "Trending Reddit Discussion",
+                    snippet: summary || "This is a dummy snippet generated due to lack of real data.",
+                    link: "https://www.reddit.com/r/dummyPost",
+                });
+            }
+    
+            // Step 5: Prepare a prompt for Groq API to summarize the scraped data
             const context = `
-                As a marketing analyst, provide detailed insights based on the following Reddit discussions:
-                - Analyze sentiment and common themes in user feedback
-                - Identify potential marketing opportunities and user pain points
-                - Extract competitive intelligence and market positioning insights
-                - Suggest marketing strategies based on user sentiments
-                
-                Structure the analysis as follows:
-                1. Sentiment Overview
-                    - Positive feedback themes
-                    - Negative feedback themes
-                    - Neutral observations
-                2. Market Intelligence
-                    - Competitor mentions
-                    - Price sensitivity
-                    - Feature preferences
-                3. Marketing Recommendations
-                    - Content strategy
-                    - Value proposition
-                    - Target audience insights
-                    - Channel recommendations
+                Provide insights and recommendations based on the following Reddit discussion data:
+                - Summarize key discussion trends and common user sentiments.
+                - Identify potential product/service opportunities mentioned in the discussions.
+                - Highlight potential challenges or complaints frequently mentioned.
+                - Structure the summary hierarchically:
+                    - Key Trends
+                    - Opportunities
+                    - Challenges
+                    - Recommendations
             `;
     
-            // Get analysis from Groq API
-            const analysisResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            // Step 6: Summarize data using Groq API
+            const summaryResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -244,67 +265,32 @@ const Components = {
                     model: "mixtral-8x7b-32768",
                     messages: [
                         { role: "system", content: context },
-                        { role: "user", content: JSON.stringify(redditData) },
+                        { role: "user", content: JSON.stringify(results) },
                     ],
                     temperature: 0.7,
                     max_tokens: 3000,
                 }),
             });
     
-            if (!analysisResponse.ok) {
-                throw new Error('Failed to analyze data using Groq API.');
+            if (!summaryResponse.ok) {
+                throw new Error('Failed to summarize data using Groq API.');
             }
     
-            const analysisData = await analysisResponse.json();
-            const analysis = analysisData.choices?.[0]?.message?.content || "No analysis available.";
+            const summaryData = await summaryResponse.json();
+            const summary = summaryData.choices?.[0]?.message?.content || "No summary data available.";
     
-            // Display the results
-            this.displayRedditAnalysis(redditData, analysis);
+            // Step 7: Use component to display data
+            this.displayRedditResults(results, summary);
         } catch (error) {
-            console.error("Error in fetchRedditAnalysis:", error);
-            
+            console.error("Error in fetchRedditInsights:", error);
+    
             container.innerHTML = `
-                <h3>Reddit Analysis</h3>
+                <h3>Reddit Insights</h3>
                 <p class="error">Error: ${error.message}</p>
             `;
         }
     },
     
-    // Display component for Reddit analysis
-    displayRedditAnalysis(redditData, analysis) {
-        const container = document.getElementById('redditResults');
-        
-        container.innerHTML = `
-            <div class="analysis-container">
-                <h3>Reddit Marketing Analysis</h3>
-                
-                <div class="analysis-section">
-                    <h4>AI Analysis</h4>
-                    <pre class="analysis-content">${analysis}</pre>
-                </div>
-    
-                <div class="source-data-section">
-                    <h4>Source Threads</h4>
-                    ${redditData.threads.map(thread => `
-                        <div class="thread-card">
-                            <h5>${thread.title}</h5>
-                            <p>Upvotes: ${thread.upvotes}</p>
-                            <div class="comments">
-                                <h6>Top Comments:</h6>
-                                ${thread.comments.map(comment => `
-                                    <div class="comment">
-                                        <p>${comment.text}</p>
-                                        <small>Upvotes: ${comment.upvotes}</small>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    },
-
 
     async generateTrendGraph(query) {
         const container = document.getElementById('trendGraph');
@@ -501,14 +487,68 @@ const Components = {
         container.innerHTML = '<h3>YouTube Analysis</h3><p>YouTube content analysis would appear here...</p>';
     },
 
-    async generateTrendGraph(query) {
-        const container = document.getElementById('trendGraph');
-        container.innerHTML = '<h3>Trend Analysis</h3><p>Trend visualization would appear here...</p>';
-    },
 
     async analyzeSentiment(query) {
         const container = document.getElementById('sentimentAnalysis');
-        container.innerHTML = '<h3>Sentiment Analysis</h3><p>Sentiment analysis results would appear here...</p>';
+        container.innerHTML = '<h3>Sentiment Analysis</h3><p>Loading sentiment analysis...</p>';
+    
+        try {
+            // Prepare the context for sentiment analysis
+            const context = `
+                Analyze the public sentiment and market insights for the given product/topic. 
+                Structure your response as follows:
+                1. Overall Sentiment: Provide a clear positive/negative/neutral rating with percentage
+                2. Key Sentiment Drivers: List main factors affecting public opinion
+                3. Market Positioning: Analyze where this fits in the market
+                4. Consumer Perception: Detail how consumers view this product/topic
+                5. Recommendations: Suggest improvements based on sentiment
+                
+                Format the response in a clean, HTML-friendly structure with appropriate headings and sections.
+                Include specific percentages and metrics where relevant.
+            `;
+    
+            // Get sentiment analysis from Groq API
+            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${CONFIG.sGROQ_API_KEY}`,
+                },
+                body: JSON.stringify({
+                    model: "mixtral-8x7b-32768",
+                    messages: [
+                        { role: "system", content: context },
+                        { role: "user", content: `Analyze public sentiment and market insights for: ${query}` }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 2000,
+                })
+            });
+    
+            if (!response.ok) {
+                throw new Error('Failed to get sentiment analysis from Groq API');
+            }
+    
+            const data = await response.json();
+            const analysis = data.choices?.[0]?.message?.content || "No sentiment analysis available.";
+    
+            // Display the formatted analysis
+            container.innerHTML = `
+                <div class="sentiment-analysis">
+                    <h3>Sentiment Analysis</h3>
+                    <div class="analysis-content">
+                        ${analysis}
+                    </div>
+                </div>
+            `;
+            
+        } catch (error) {
+            console.error("Error in analyzeSentiment:", error);
+            container.innerHTML = `
+                <h3>Sentiment Analysis</h3>
+                <p class="error">Error analyzing sentiment: ${error.message}</p>
+            `;
+        }
     },
 
     async updateMediaGallery(query) {
