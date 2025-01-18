@@ -340,18 +340,20 @@ const Components = {
             const groqResponse = await response.json();
             const data = JSON.parse(groqResponse.choices[0].message.content);
     
-            // Prepare container for all charts
+            // Prepare container for all charts with modified layout
             container.innerHTML = `
                 <h3>Market Analysis Dashboard</h3>
                 <div class="charts-grid">
-                    <div class="chart-container">
+                    <div class="chart-container large">
                         <canvas id="historicTrendChart"></canvas>
                     </div>
-                    <div class="chart-container">
-                        <canvas id="marketShareChart"></canvas>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="sentimentChart"></canvas>
+                    <div class="pie-charts-row">
+                        <div class="chart-container small">
+                            <canvas id="marketShareChart"></canvas>
+                        </div>
+                        <div class="chart-container small">
+                            <canvas id="sentimentChart"></canvas>
+                        </div>
                     </div>
                     <div class="chart-container">
                         <canvas id="regionalChart"></canvas>
@@ -365,18 +367,42 @@ const Components = {
                 </div>
             `;
     
-            // Common chart colors
+            // Add CSS for the new layout
+            const style = document.createElement('style');
+            style.textContent = `
+                .charts-grid {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 20px;
+                }
+                .chart-container.large {
+                    width: 100%;
+                    height: 400px;
+                }
+                .pie-charts-row {
+                    display: flex;
+                    gap: 20px;
+                    justify-content: space-between;
+                }
+                .chart-container.small {
+                    width: 48%;
+                    height: 250px;
+                }
+            `;
+            document.head.appendChild(style);
+    
+            // Common chart colors (orange shades)
             const colors = {
-                line: 'rgb(75, 192, 192)',
+                line: 'rgb(255, 159, 64)',
                 pie: [
-                    'rgb(255, 99, 132)',
-                    'rgb(54, 162, 235)',
-                    'rgb(255, 205, 86)',
-                    'rgb(75, 192, 192)',
-                    'rgb(153, 102, 255)',
-                    'rgb(255, 159, 64)'
+                    'rgb(255, 159, 64)',  // orange
+                    'rgb(255, 127, 80)',  // coral
+                    'rgb(255, 140, 0)',   // dark orange
+                    'rgb(255, 165, 0)',   // orange
+                    'rgb(255, 179, 71)',  // mellow orange
+                    'rgb(255, 197, 92)'   // light orange
                 ],
-                bar: 'rgb(54, 162, 235)'
+                bar: 'rgb(255, 159, 64)'
             };
     
             // Create Historic Trend Line Chart
@@ -392,6 +418,7 @@ const Components = {
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     plugins: { title: { display: true, text: data.historicTrend.title } }
                 }
             });
@@ -408,7 +435,11 @@ const Components = {
                 },
                 options: {
                     responsive: true,
-                    plugins: { title: { display: true, text: data.marketShare.title } }
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        title: { display: true, text: data.marketShare.title },
+                        legend: { position: 'right', labels: { fontSize: 10 } }
+                    }
                 }
             });
     
@@ -424,7 +455,11 @@ const Components = {
                 },
                 options: {
                     responsive: true,
-                    plugins: { title: { display: true, text: data.sentiment.title } }
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        title: { display: true, text: data.sentiment.title },
+                        legend: { position: 'right', labels: { fontSize: 10 } }
+                    }
                 }
             });
     
@@ -441,6 +476,7 @@ const Components = {
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     plugins: { title: { display: true, text: data.regional.title } }
                 }
             });
@@ -458,6 +494,7 @@ const Components = {
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     plugins: { title: { display: true, text: data.demographics.title } }
                 }
             });
@@ -475,6 +512,7 @@ const Components = {
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     plugins: { title: { display: true, text: data.priceDistribution.title } }
                 }
             });
