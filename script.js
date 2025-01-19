@@ -598,14 +598,199 @@ const Components = {
         }
     },
 
-    async updateMediaGallery(query) {
+    async updateMediaGallery(query) { 
         const container = document.getElementById('mediaGallery');
-        container.innerHTML = `
-            <h3>Media Gallery</h3>
-            <div class="videos-container"><p>Video content would appear here...</p></div>
-            <div class="images-gallery"><p>Additional images would appear here...</p></div>
-        `;
+        container.innerHTML = '<h3>Media Gallery</h3><div class="loading">Generating advertising concepts...</div>';
+    
+        try {
+            // Step 1: Generate ad concepts using Groq
+            const promptResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${CONFIG.iGROQ_API_KEY}`,
+                },
+                body: JSON.stringify({
+                    model: "mixtral-8x7b-32768",
+                    messages: [
+                        {
+                            role: "system",
+                            content: "You are an advertising expert. Create 4 clear, detailed image prompts for SDXL image generation."
+                        },
+                        {
+                            role: "user",
+                            content: `Generate 4 different advertising image prompts for ${query}. Each prompt should be self-contained and focus on different aspects: lifestyle, product showcase, emotional appeal, and brand story.`
+                        }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 1000
+                })
+            });
+    
+            const promptData = await promptResponse.json();
+            
+            // Extract prompts from the response text
+            const responseText = promptData.choices[0].message.content;
+            const prompts = responseText.split('\n')
+                .filter(line => line.trim().length > 0)
+                .slice(0, 4)
+                .map(line => line.replace(/^\d+\.\s*/, '').trim());
+    
+            console.log('Generated prompts:', prompts);
+    
+            // Step 2: Generate images using Segmind API
+            container.innerHTML = '<h3>Media Gallery</h3><div class="loading">Generating images... (0/4)</div>';
+            
+            const images = [];
+            for (let i = 0; i < prompts.length; i++) {
+                try {
+                    const response = await fetch("https://api.segmind.com/v1/sdxl1.0-txt2img", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "x-api-key": CONFIG.SEGMIND_API_KEY
+                        },
+                        body: JSON.stringify({
+                            prompt: prompts[i],
+                            negative_prompt: "None",
+                            style: "base",
+                            samples: 1,
+                            scheduler: "UniPC",
+                            num_inference_steps: 25,
+                            guidance_scale: 7.5,
+                            seed: -1,
+                            img_width: 1024,
+                            img_height: 1024,
+                            refiner: true,
+                            base64: true  // Changed to true to get direct image data
+                        })
+                    });
+    
+                    if (!response.ok) {
+                        throw new Error(`API error: ${response.status}`);
+                    }
+    
+                    // Get the response as JSON
+                    const imageData = await response.json();
+                    const base64Data = imageData.image; // Assuming the API returns the base64 data in a field called "image"
+    
+                    // Add the "data:image/png;base64," prefix if it's missing
+                    const fullBase64Data = base64Data.startsWith('data:image') ? base64Data : `data:image/png;base64,${base64Data}`;
+    
+                    // Create an image URL from the base64 data
+                    images.push({ url: fullBase64Data, prompt: prompts[i] });
+    
+                    // Update progress
+                    container.querySelector('.loading').textContent = `Generating images... (${i + 1}/4)`;
+    
+                } catch (error) {
+                    console.error(`Error generating image ${i + 1}:`, error);
+                    images.push({ error: true, prompt: prompts[i] });
+                }
+            }
+    
+            // Step 3: Display results
+            container.innerHTML = `
+                <div class="gallery-container">
+                    <h3>AI-Generated Ad Concepts</h3>
+                    <div class="images-slider">
+                        ${images.map((img, index) => `
+                            <div class="image-slide">
+                                ${img.error ? 
+                                    `<div class="error-placeholder">Image generation failed</div>` :
+                                    `<img src="${img.url}" alt="Ad Concept ${index + 1}" class="ad-image">`
+                                }
+                                <div class="image-details">
+                                    <div class="image-caption">Concept ${index + 1}</div>
+                                    <div class="prompt-text">${img.prompt}</div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+    
+            // Add styling
+            const style = document.createElement('style');
+            style.textContent = `
+                .gallery-container {
+                    padding: 20px;
+                    background: #000; /* Black background */
+                    border-radius: 8px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    color: #fff; /* White text for better contrast */
+                }
+    
+                .images-slider {
+                    display: flex;
+                    overflow-x: auto;
+                    gap: 20px;
+                    margin-top: 20px;
+                    padding-bottom: 20px; /* Space for scrollbar */
+                }
+    
+                .image-slide {
+                    flex: 0 0 auto;
+                    width: 300px;
+                    background: #333; /* Dark background for each slide */
+                    border-radius: 8px;
+                    overflow: hidden;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                }
+    
+                .ad-image {
+                    width: 100%;
+                    height: 200px;
+                    object-fit: cover;
+                    display: block;
+                }
+    
+                .error-placeholder {
+                    width: 100%;
+                    height: 200px;
+                    background: #444; /* Darker background for error placeholder */
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #ccc; /* Light grey text for error placeholder */
+                }
+    
+                .image-details {
+                    padding: 15px;
+                    background: #222; /* Dark background for details */
+                }
+    
+                .image-caption {
+                    font-weight: bold;
+                    margin-bottom: 8px;
+                    color: #fff; /* White text for caption */
+                }
+    
+                .prompt-text {
+                    font-size: 14px;
+                    color: #ccc; /* Light grey text for prompt */
+                    line-height: 1.4;
+                }
+    
+                .loading {
+                    text-align: center;
+                    padding: 20px;
+                    color: #ccc; /* Light grey text for loading */
+                }
+            `;
+            document.head.appendChild(style);
+    
+        } catch (error) {
+            console.error("Error in updateMediaGallery:", error);
+            container.innerHTML = `
+                <div class="error-container">
+                    <h3>Media Gallery</h3>
+                    <p class="error-message">Error: ${error.message}</p>
+                </div>
+            `;
+        }
     }
+
 };
 
 // Display functions
