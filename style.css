@@ -44,7 +44,8 @@ h1 {
     text-align: center;
     font-size: 3em;
     margin-bottom: 25px;
-    text-shadow: 0 0 15px rgba(255, 140, 0, 0.7);
+    text-shadow: 0 0 15px rgba(255, 140, 0, 0.336);
+    color: #FF8C00;
 }
 
 /* Search Section Styles */
@@ -172,6 +173,7 @@ h3 {
     font-size: 1.5em;
     border-bottom: 2px solid var(--primary-color);
     padding-bottom: 10px;
+    color: #FFFFFF;
 }
 
 /* Images Section Styles */
@@ -260,15 +262,16 @@ h3 {
     height: 100%;
     border: none;
 }
+
 /* General container styles */
 #googleResults {
-    max-width: 100%; /* Ensure the container doesn't exceed its parent width */
-    overflow: hidden; /* Prevent data from overflowing */
-    padding: 10px; /* Add some spacing */
-    border: 1px solid #ccc; /* Add a border for better visibility */
+    max-width: 100%;
+    overflow: hidden;
+    padding: 10px;
+    border: 1px solid #FF8C00;
     border-radius: 5px;
-    background-color: #ffffff; /* Add background color */
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Slight shadow for aesthetics */
+    background-color: #000000;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* Table container to make it scrollable */
@@ -276,8 +279,8 @@ h3 {
     width: 100%;
     border-collapse: collapse;
     margin-top: 20px;
-    overflow-x: auto; /* Allow horizontal scrolling if table is too wide */
-    display: block; /* Ensure table scrolls inside the container */
+    overflow-x: auto;
+    display: block;
 }
 
 /* Table headers and rows */
@@ -286,7 +289,7 @@ h3 {
     border: 1px solid #000000;
     padding: 10px;
     text-align: left;
-    word-wrap: break-word; /* Prevent long words from breaking layout */
+    word-wrap: break-word;
 }
 
 .results-table th {
@@ -300,9 +303,10 @@ h3 {
     border-radius: 5px;
     font-family: monospace;
     white-space: pre-wrap;
-    word-wrap: break-word; /* Wrap long lines */
-    overflow-y: auto; /* Allow vertical scrolling if content is too long */
-    max-height: 300px; /* Limit height to prevent component overflow */
+    word-wrap: break-word;
+    overflow-y: auto;
+    max-height: 300px;
+    font-size: 1.2em;  /* Increased from default size */
 }
 
 /* News Results Styles */
@@ -317,6 +321,7 @@ h3 {
 
 .news-result h4 {
     margin-bottom: 10px;
+    color: #FFFFFF;
 }
 
 .news-result a {

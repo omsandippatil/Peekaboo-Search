@@ -24,8 +24,11 @@ const API = {
     },
 
     async searchImages(query) {
+        // Append "advertisement" to the search query
+        const searchQuery = `${query} advertisement`;
+        
         const response = await fetch(
-            `https://www.googleapis.com/customsearch/v1?key=${CONFIG.GOOGLE_API_KEY}&cx=${CONFIG.GOOGLE_SEARCH_ENGINE_ID}&q=${query}&searchType=image&num=8`
+            `https://www.googleapis.com/customsearch/v1?key=${CONFIG.GOOGLE_API_KEY}&cx=${CONFIG.GOOGLE_SEARCH_ENGINE_ID}&q=${encodeURIComponent(searchQuery)}&searchType=image&num=8`
         );
         return response.ok ? response.json() : null;
     },
@@ -531,7 +534,227 @@ const Components = {
 
     async fetchYouTubeAnalysis(query) {
         const container = document.getElementById('youtubeAnalysis');
-        container.innerHTML = '<h3>YouTube Analysis</h3><p>YouTube content analysis would appear here...</p>';
+        container.innerHTML = '<h3>Loading YouTube Analysis...</h3>';
+    
+        // Import icons from Lucide
+        const style = document.createElement('style');
+        style.textContent = `
+            .youtube-container {
+                padding: 20px;
+                background: #0f0f0f;
+                border-radius: 8px;
+                color: #fff;
+            }
+    
+            .youtube-header {
+                margin-bottom: 20px;
+                padding: 0 10px;
+            }
+    
+            .youtube-header h3 {
+                font-size: 24px;
+                font-weight: 600;
+            }
+    
+            .youtube-scroll {
+                display: flex;
+                overflow-x: auto;
+                gap: 20px;
+                padding: 10px 0;
+                scrollbar-width: thin;
+                scrollbar-color: #666 #0f0f0f;
+            }
+    
+            .youtube-scroll::-webkit-scrollbar {
+                height: 8px;
+            }
+    
+            .youtube-scroll::-webkit-scrollbar-track {
+                background: #0f0f0f;
+            }
+    
+            .youtube-scroll::-webkit-scrollbar-thumb {
+                background: #666;
+                border-radius: 4px;
+            }
+    
+            .youtube-card {
+                flex: 0 0 320px;
+                background: #1f1f1f;
+                border-radius: 8px;
+                overflow: hidden;
+                transition: transform 0.2s;
+            }
+    
+            .youtube-card:hover {
+                transform: translateY(-5px);
+            }
+    
+            .youtube-thumbnail {
+                position: relative;
+                width: 100%;
+                height: 180px;
+                overflow: hidden;
+                cursor: pointer;
+            }
+    
+            .youtube-thumbnail img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                transition: transform 0.3s;
+            }
+    
+            .youtube-thumbnail:hover img {
+                transform: scale(1.05);
+            }
+    
+            .youtube-content {
+                padding: 16px;
+            }
+    
+            .youtube-title {
+                font-size: 16px;
+                font-weight: 600;
+                margin-bottom: 12px;
+                line-height: 1.4;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+            }
+    
+            .youtube-description {
+                font-size: 14px;
+                color: #aaa;
+                margin-bottom: 16px;
+                display: -webkit-box;
+                -webkit-line-clamp: 3;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+                line-height: 1.4;
+            }
+    
+            .youtube-stats {
+                display: flex;
+                gap: 20px;
+                font-size: 14px;
+                color: #aaa;
+            }
+    
+            .youtube-stat {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+    
+            .youtube-stat svg {
+                width: 18px;
+                height: 18px;
+                color: #aaa;
+            }
+    
+            .youtube-stat span {
+                font-size: 14px;
+            }
+        `;
+        document.head.appendChild(style);
+    
+        try {
+            // Append "advertisement" to the search query
+            const searchQuery = `${query} advertisement`;
+            
+            // Fetch videos related to the query
+            const searchResponse = await fetch(
+                `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=8&q=${encodeURIComponent(searchQuery)}&key=${CONFIG.YOUTUBE_API_KEY}`
+            );
+    
+            if (!searchResponse.ok) throw new Error('Failed to fetch video search results.');
+    
+            const searchData = await searchResponse.json();
+            if (!searchData.items || searchData.items.length === 0) {
+                container.innerHTML = '<h3>YouTube Analysis</h3><p>No videos found for this query.</p>';
+                return;
+            }
+    
+            // Extract video IDs for fetching statistics
+            const videoIds = searchData.items.map(item => item.id.videoId).join(',');
+    
+            // Fetch video statistics
+            const statsResponse = await fetch(
+                `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${videoIds}&key=${CONFIG.YOUTUBE_API_KEY}`
+            );
+    
+            if (!statsResponse.ok) throw new Error('Failed to fetch video statistics.');
+    
+            const statsData = await statsResponse.json();
+            const statsMap = statsData.items.reduce((map, video) => {
+                map[video.id] = video.statistics;
+                return map;
+            }, {});
+    
+            // Format numbers for display
+            const formatNumber = (num) => {
+                if (!num) return 'N/A';
+                if (num >= 1000000) return (num/1000000).toFixed(1) + 'M';
+                if (num >= 1000) return (num/1000).toFixed(1) + 'K';
+                return num;
+            };
+    
+            // Display results
+            container.innerHTML = `
+                <div class="youtube-container">
+                    <div class="youtube-header">
+                        <h3>YouTube Advertisement Analysis</h3>
+                    </div>
+                    <div class="youtube-scroll">
+                        ${searchData.items.map(video => {
+                            const stats = statsMap[video.id.videoId] || {};
+                            return `
+                                <div class="youtube-card">
+                                    <div class="youtube-thumbnail" onclick="window.open('https://www.youtube.com/watch?v=${video.id.videoId}', '_blank')">
+                                        <img src="${video.snippet.thumbnails.medium.url}" alt="${video.snippet.title}" />
+                                    </div>
+                                    <div class="youtube-content">
+                                        <div class="youtube-title">${video.snippet.title}</div>
+                                        <div class="youtube-description">${video.snippet.description}</div>
+                                        <div class="youtube-stats">
+                                            <div class="youtube-stat">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+                                                    <circle cx="12" cy="12" r="3"/>
+                                                </svg>
+                                                <span>${formatNumber(stats.viewCount)}</span>
+                                            </div>
+                                            <div class="youtube-stat">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M7 10v12"/>
+                                                    <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/>
+                                                </svg>
+                                                <span>${formatNumber(stats.likeCount)}</span>
+                                            </div>
+                                            <div class="youtube-stat">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                                </svg>
+                                                <span>${formatNumber(stats.commentCount)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        } catch (error) {
+            container.innerHTML = `
+                <div class="youtube-container">
+                    <h3>YouTube Analysis</h3>
+                    <p class="error">${error.message}</p>
+                </div>
+            `;
+        }
     },
 
 
